@@ -1,103 +1,183 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import BurstPattern from '@/components/logoCircle';
+import { FaTrash } from 'react-icons/fa';
+import axios from 'axios';
+
+export default function Dashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState({ name: '', email: '' });
+  const [notes, setNotes] = useState([]);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const verifyUser = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return router.push('/login');
+
+      try {
+        const res = await axios.post(
+          'https://dnotesapp.netlify.app/api/auth/user/verify',
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setUser(res.data.user);
+        await fetchNotes(token);
+        setLoading(false);
+      } catch (err) {
+        console.error('Token verification failed:', err.response?.data || err.message);
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
+    };
+
+    verifyUser();
+  }, [router]);
+
+  const fetchNotes = async (token) => {
+    try {
+      const res = await axios.get('https://dnotesapp.netlify.app/api/notes', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNotes(res.data);
+    } catch (err) {
+      console.error('Failed to fetch notes:', err.message);
+    }
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
+
+  const handleCreateNote = () => setShowNoteForm(true);
+
+  const handleSaveNote = async () => {
+    if (!newNoteText.trim()) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post(
+        'https://dnotesapp.netlify.app/api/notes',
+        { content: newNoteText.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setNotes([res.data, ...notes]);
+      setNewNoteText('');
+      setShowNoteForm(false);
+    } catch (err) {
+      console.error('Failed to save note:', err.message);
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`https://dnotesapp.netlify.app/api/notes/${noteId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setNotes(notes.filter((n) => n._id !== noteId));
+    } catch (err) {
+      console.error('Failed to delete note:', err.message);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-white px-4 py-6 max-w-md mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <div className="w-[32px] h-[32px] mr-2">
+            <BurstPattern />
+          </div>
+          <h1 className="text-lg font-semibold mt-4 ml-4">Dashboard</h1>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={handleSignOut}
+          className="text-blue-600 font-medium mt-4 text-sm hover:underline"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Sign Out
+        </button>
+      </div>
+
+      {/* User Info */}
+      <div className="bg-white shadow-md rounded-lg p-4 mb-6">
+        <p className="text-lg font-semibold mb-1">
+          Welcome, {user.name || 'User'}!
+        </p>
+        <p className="text-gray-600 text-sm">Email: {user.email}</p>
+      </div>
+
+      {/* Create Note Button */}
+      {!showNoteForm && (
+        <button
+          onClick={handleCreateNote}
+          className="w-full bg-blue-600 text-white py-2 rounded-md mb-6 hover:bg-blue-700 transition"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          Create Note
+        </button>
+      )}
+
+      {/* Note Form */}
+      {showNoteForm && (
+        <div className="mb-6">
+          <textarea
+            value={newNoteText}
+            onChange={(e) => setNewNoteText(e.target.value)}
+            placeholder="Write your note..."
+            className="w-full h-32 p-3 border border-gray-300 rounded-md mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveNote}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setShowNoteForm(false);
+                setNewNoteText('');
+              }}
+              className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-md hover:bg-gray-400 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notes List */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3">Notes</h2>
+        {loading ? (
+          <p className="text-sm text-gray-500">Loading notes...</p>
+        ) : notes.length === 0 ? (
+          <p className="text-sm text-gray-500">No notes yet. Add one!</p>
+        ) : (
+          notes.map((note) => (
+            <div
+              key={note._id}
+              className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 mb-3 shadow-sm"
+            >
+              <span className="break-words">{note.content}</span>
+              <button
+                onClick={() => handleDeleteNote(note._id)}
+                className="text-red-500 hover:text-red-700"
+                aria-label="Delete note"
+              >
+                <FaTrash size={16} />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
